@@ -6,6 +6,7 @@ import aiRoutes from '../modules/ai/ai.routes.js';
 import jobTrackerRoutes from '../modules/job-tracker/job-tracker.routes.js';
 import blogRoutes from '../modules/blogs/blog.routes.js';
 import notificationRoutes from '../modules/notifications/notification.routes.js';
+import adminRoutes from '../modules/admin/admin.routes.js';
 
 const router = Router();
 
@@ -16,5 +17,7 @@ router.use('/ai', aiRoutes);
 router.use('/job-tracker', jobTrackerRoutes);
 router.use('/blogs', blogRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;
+
