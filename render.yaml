@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: careerpilot-server
+    runtime: node
+    buildCommand: pnpm prisma:generate && pnpm run build
+    startCommand: pnpm start
+    preDeployCommand: pnpm prisma migrate deploy
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromSecret: database_url
+      - key: REDIS_URL
+        fromSecret: redis_url
+      - key: JWT_SECRET
+        fromSecret: jwt_secret
+      - key: JWT_REFRESH_SECRET
+        fromSecret: jwt_refresh_secret
+      # Add other secrets as needed
