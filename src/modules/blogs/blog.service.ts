@@ -67,12 +67,18 @@ export const getBlogBySlug = async (slug: string) => {
 };
 
 export const createBlog = async (userId: string, data: any) => {
-  let slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  let slug = (data.slug || data.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   const existing = await prisma.blog.findUnique({ where: { slug } });
   if (existing) slug = `${slug}-${Date.now()}`;
 
   const blog = await prisma.blog.create({
-    data: { ...data, slug, authorId: userId },
+    data: {
+      ...data,
+      slug,
+      authorId: userId,
+      thumbnail: data.thumbnail || null,
+      tags: Array.isArray(data.tags) ? data.tags : [],
+    },
   });
 
   await invalidateBlogCache();
@@ -87,14 +93,21 @@ export const updateBlog = async (id: string, userId: string, role: string, data:
   }
 
   let slug = blog.slug;
-  if (data.title) {
-    slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  if (data.title || data.slug) {
+    slug = String(data.slug || data.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const existing = await prisma.blog.findFirst({ where: { slug, id: { not: id } } });
     if (existing) slug = `${slug}-${Date.now()}`;
     data.slug = slug;
   }
 
-  const updated = await prisma.blog.update({ where: { id }, data });
+  const updated = await prisma.blog.update({
+    where: { id },
+    data: {
+      ...data,
+      thumbnail: data.thumbnail === '' ? null : data.thumbnail,
+      tags: Array.isArray(data.tags) ? data.tags : data.tags === undefined ? undefined : [],
+    },
+  });
   await invalidateBlogCache(blog.slug);
   if (data.slug && data.slug !== blog.slug) await invalidateBlogCache(data.slug);
   return updated;

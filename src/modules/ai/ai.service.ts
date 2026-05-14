@@ -13,6 +13,11 @@ type StructuredAIResponse = {
 
 const GEMINI_MODEL = 'gemini-2.0-flash';
 
+function estimateTokens(...segments: string[]) {
+  const text = segments.join(' ');
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
 function fallbackReasonLabel(reason: string) {
   return reason === 'quota_exceeded'
     ? 'The live AI provider hit its quota limit.'
@@ -283,6 +288,15 @@ export const processAIRequest = async (userId: string, type: AIResultType, promp
   const cachedResponse = await getCache(cacheKey);
   if (cachedResponse) {
     logger.info('AI cache hit', { userId, type, cacheKey });
+    await prisma.aIUsageLog.create({
+      data: {
+        userId,
+        feature: type,
+        tokensUsed: estimateTokens(prompt, JSON.stringify(cachedResponse)),
+        responseTime: 0,
+        success: true,
+      },
+    });
     return cachedResponse;
   }
 
@@ -292,8 +306,20 @@ export const processAIRequest = async (userId: string, type: AIResultType, promp
 
   logger.info('AI request processed', { userId, type, latencyMs, promptLength: prompt.length });
 
+  const tokensUsed = estimateTokens(prompt, response.summary, response.details.join(' '), response.recommendations.join(' '));
+
   await prisma.aIResult.create({
     data: { userId, type, prompt, response },
+  });
+
+  await prisma.aIUsageLog.create({
+    data: {
+      userId,
+      feature: type,
+      tokensUsed,
+      responseTime: latencyMs,
+      success: !response.details.some((detail) => detail.toLowerCase().includes('provider was unavailable') || detail.toLowerCase().includes('quota limit')),
+    },
   });
 
   await setCache(cacheKey, response, 3600);

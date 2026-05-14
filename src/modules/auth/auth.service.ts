@@ -4,6 +4,7 @@ import { prisma } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 import { generateSecureToken, hashToken } from '../../utils/tokenHelper.js';
+import { UserStatus } from '@prisma/client';
 
 // In-memory store for password reset tokens (replace with DB/Redis in production)
 const resetTokenStore = new Map<string, { userId: string; expiresAt: number }>();
@@ -41,6 +42,15 @@ export const loginUser = async (data: any) => {
     logger.warn('Auth: login failed — wrong password', { userId: user.id });
     throw { statusCode: 401, message: 'Invalid credentials' };
   }
+
+  if (user.status === UserStatus.SUSPENDED) {
+    throw { statusCode: 403, message: 'This account has been suspended. Please contact support.' };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastActiveAt: new Date() },
+  });
 
   logger.info('Auth: user logged in', { userId: user.id });
   return generateTokens(user);

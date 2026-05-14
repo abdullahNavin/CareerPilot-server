@@ -14,6 +14,20 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum MentorStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 enum DemandLevel {
   LOW
   MEDIUM
@@ -35,22 +49,75 @@ enum AIResultType {
   COVER_LETTER
 }
 
+enum NotificationType {
+  PLATFORM_UPDATE
+  AI_USAGE_ALERT
+  SECURITY_ALERT
+  ADMIN_ANNOUNCEMENT
+}
+
+enum NotificationTarget {
+  ALL
+  USER
+  MENTOR
+  ADMIN
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ModerationStatus {
+  OPEN
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum SecuritySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 model User {
   id              String           @id @default(uuid()) @db.Uuid
   name            String
   email           String           @unique
   password        String
   role            Role             @default(USER)
+  status          UserStatus       @default(ACTIVE)
+  mentorStatus    MentorStatus     @default(NONE)
+  permissions     String[]         @default([])
   avatar          String?
   bio             String?
+  suspendedAt     DateTime?
+  lastActiveAt    DateTime         @default(now())
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   profile         Profile?
   jobApplications JobApplication[]
   blogs           Blog[]
   aiResults       AIResult[]
+  aiUsageLogs     AIUsageLog[]
   notifications   Notification[]
   reviews         Review[]
+  moderationReportsFiled ModerationReport[] @relation("ReportFiledBy")
+  moderationReportsTargeted ModerationReport[] @relation("ReportTargetsUser")
+  supportTickets SupportTicket[] @relation("SupportTicketUser")
+  assignedSupportTickets SupportTicket[] @relation("SupportTicketAssignee")
+  securityEvents SecurityEvent[]
 }
 
 model Profile {
@@ -98,11 +165,13 @@ model Blog {
   slug      String   @unique
   content   String
   thumbnail String?
+  tags      String[] @default([])
   authorId  String   @db.Uuid
   user      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   category  String
   published Boolean  @default(false)
   createdAt DateTime @default(now())
+  reports   ModerationReport[] @relation("ReportTargetsBlog")
 }
 
 model AIResult {
@@ -117,12 +186,27 @@ model AIResult {
   @@index([userId, type])
 }
 
+model AIUsageLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @db.Uuid
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  feature      String
+  tokensUsed   Int      @default(0)
+  responseTime Int
+  success      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt, feature])
+}
+
 model Notification {
   id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?  @db.Uuid
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String
+  type      NotificationType   @default(PLATFORM_UPDATE)
+  roleTarget NotificationTarget @default(ALL)
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -138,4 +222,48 @@ model Review {
   rating    Int
   message   String
   createdAt DateTime @default(now())
+}
+
+model ModerationReport {
+  id           String           @id @default(uuid()) @db.Uuid
+  reporterId   String?          @db.Uuid
+  reporter     User?            @relation("ReportFiledBy", fields: [reporterId], references: [id], onDelete: SetNull)
+  targetUserId String?          @db.Uuid
+  targetUser   User?            @relation("ReportTargetsUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetBlogId String?          @db.Uuid
+  targetBlog   Blog?            @relation("ReportTargetsBlog", fields: [targetBlogId], references: [id], onDelete: SetNull)
+  reason       String
+  description  String?
+  status       ModerationStatus @default(OPEN)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  resolvedAt   DateTime?
+}
+
+model SupportTicket {
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String?        @db.Uuid
+  user         User?          @relation("SupportTicketUser", fields: [userId], references: [id], onDelete: SetNull)
+  assignedToId String?        @db.Uuid
+  assignedTo   User?          @relation("SupportTicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  email        String?
+  subject      String
+  message      String
+  status       SupportStatus  @default(OPEN)
+  priority     SupportPriority @default(MEDIUM)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model SecurityEvent {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String?          @db.Uuid
+  user       User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type       String
+  severity   SecuritySeverity @default(MEDIUM)
+  message    String
+  ipAddress  String?
+  createdAt  DateTime         @default(now())
+
+  @@index([createdAt, severity])
 }
