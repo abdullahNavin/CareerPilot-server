@@ -1,19 +1,25 @@
 services:
   - type: web
-    name: careerpilot-server
-    runtime: node
-    buildCommand: pnpm prisma:generate && pnpm run build
-    startCommand: pnpm start
-    preDeployCommand: pnpm prisma migrate deploy
+    name: careerpilot-api
+    env: node
+    plan: free # Change to starter/pro if you need more resources
+    buildCommand: pnpm install && pnpm run prisma:generate && pnpm run build
+    startCommand: pnpm run start
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromSecret: database_url
+        sync: false # Set this in the Render dashboard!
       - key: REDIS_URL
-        fromSecret: redis_url
+        sync: false # Set this in the Render dashboard!
+      - key: CORS_ORIGIN
+        sync: false # Set this to your frontend URL (e.g., https://careerpilot.vercel.app)
       - key: JWT_SECRET
-        fromSecret: jwt_secret
+        generateValue: true
       - key: JWT_REFRESH_SECRET
-        fromSecret: jwt_refresh_secret
-      # Add other secrets as needed
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRY
+        value: 15m
+      - key: JWT_REFRESH_EXPIRY
+        value: 7d
+      # Add other environment variables (e.g., OPENAI_API_KEY, CLOUDINARY) in the Render dashboard
